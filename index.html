@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Florida Toxics Release Hotspots 2024 • Jessica Nwafor</title>
+
+    <!-- Leaflet core -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+    <!-- MarkerCluster -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <!-- Heatmap -->
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <!-- Papa Parse and Chroma -->
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chroma-js@2.4.2/chroma.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #0f172a;
+            --panel: #101827;
+            --card: #182235;
+            --ink: #e5e7eb;
+            --muted: #9ca3af;
+            --brand: #14b8a6;
+            --accent: #f59e0b;
+            --accent2: #4f46e5;
+        }
+
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            background:
+                radial-gradient(1200px 700px at 85% -100px, rgba(56, 189, 248, .25), transparent 70%),
+                radial-gradient(900px 600px at 10% 20%, rgba(99, 102, 241, .22), transparent 60%),
+                linear-gradient(180deg, #38bdf8 0%, #6366f1 45%, #1e293b 100%);
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        }
+
+        header {
+            padding: 18px 16px;
+            border-bottom: 1px solid #0b1220;
+            background: rgba(17, 24, 39, .75);
+            backdrop-filter: blur(6px);
+            position: sticky;
+            top: 0;
+            z-index: 800;
+        }
+
+        h1 {
+            margin: 0 0 4px 0;
+            font-size: 22px
+        }
+
+        .subtitle {
+            color: var(--muted);
+            font-size: 14px
+        }
+
+        .byline {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            min-height: calc(100vh - 96px);
+            align-items: start;
+        }
+
+        @media (max-width:900px) {
+            .layout {
+                grid-template-columns: 1fr
+            }
+
+            #map {
+                height: 60vh
+            }
+
+            .chart-wrap {
+                height: 200px;
+            }
+        }
+
+        aside {
+            background: rgba(16, 24, 39, .65);
+            border-right: 1px solid #0b1220;
+            padding: 14px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid #0b1220;
+            border-radius: 16px;
+            padding: 14px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, .25);
+            margin-bottom: 12px;
+        }
+
+        label {
+            font-size: 13px;
+            color: var(--muted);
+            display: block;
+            margin-bottom: 6px
+        }
+
+        select,
+        input[type="range"],
+        input[type="text"] {
+            width: 100%;
+            background: #0b1022;
+            color: var(--ink);
+            border: 1px solid #1f2a45;
+            border-radius: 10px;
+            padding: 10px;
+            outline: none
+        }
+
+        .controls-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap
+        }
+
+        button.btn {
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid #1f2a45;
+            background: #0b1022;
+            color: var(--ink);
+            cursor: pointer
+        }
+
+        button.btn:focus {
+            outline: 2px solid var(--accent2)
+        }
+
+        .btn-pill {
+            border-radius: 999px
+        }
+
+        .small {
+            font-size: 12px;
+            color: var(--muted)
+        }
+
+        .kicker {
+            font-size: 13px;
+            margin-bottom: 6px
+        }
+
+        #map {
+            height: calc(100vh - 96px);
+            width: 100%
+        }
+
+        main {
+            position: relative;
+            min-height: calc(100vh - 96px);
+        }
+
+        /* COMPACT LEGEND that never gets clipped */
+        .legend {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            z-index: 500;
+            padding: 8px 10px;
+            border-radius: 12px;
+            background: rgba(17, 24, 39, .92);
+            border: 1px solid #0b1220;
+            color: var(--ink);
+            font-size: 11px;
+            line-height: 1.35;
+            max-width: 220px;
+            max-height: 26vh;
+            overflow: auto;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+        }
+
+        .legend .swatch {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 5px
+        }
+
+        .sizeRow {
+            display: flex;
+            align-items: center;
+            margin: 3px 0
+        }
+
+        .sizeDot {
+            display: inline-block;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .28);
+            margin-right: 8px
+        }
+
+        @media (max-width:900px) {
+            .legend {
+                max-width: 70vw;
+                max-height: 30vh;
+                bottom: 8px;
+                right: 8px;
+            }
+        }
+
+        /* Hard cap the bar chart height via wrapper */
+        .chart-wrap {
+            height: 220px;
+        }
+
+        .row {
+            display: flex;
+            flex-wrap: wrap
+        }
+
+        .chip {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 999px;
+            margin: 0 6px 6px 0;
+            border: 1px solid rgba(255, 255, 255, .12);
+            background: rgba(255, 255, 255, .05);
+            font-size: 12px;
+            cursor: pointer;
+            user-select: none
+        }
+
+        .chip.active {
+            outline: 2px solid var(--accent2)
+        }
+
+        .count {
+            font-weight: 700;
+            color: var(--brand)
+        }
+
+        footer {
+            padding: 12px 16px;
+            color: var(--muted);
+            font-size: 12px
+        }
+
+        a.linkish:link,
+        a.linkish:visited {
+            color: var(--accent);
+            text-decoration: none
+        }
+
+        a.linkish:hover,
+        a.linkish:focus {
+            text-decoration: underline
+        }
+
+        /* Modal */
+        #infoModal {
+            position: fixed;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            background: rgba(0, 0, 0, .5)
+        }
+
+        .modal-card {
+            width: min(780px, 92vw);
+            background: #0e1628;
+            color: var(--ink);
+            border: 1px solid #1f2a45;
+            border-radius: 14px;
+            padding: 16px
+        }
+
+        /* Spinner */
+        #spinner {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 700;
+            background: rgba(13, 19, 35, .35);
+            backdrop-filter: blur(2px)
+        }
+
+        .spinner-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin: 4px;
+            background: #9ca3af;
+            animation: blink 1s infinite ease-in-out both
+        }
+
+        .spinner-dot:nth-child(2) {
+            animation-delay: .15s
+        }
+
+        .spinner-dot:nth-child(3) {
+            animation-delay: .3s
+        }
+
+        @keyframes blink {
+
+            0%,
+            80%,
+            100% {
+                opacity: .2
+            }
+
+            40% {
+                opacity: 1
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Florida Toxics Release Hotspots 2024</h1>
+        <div class="subtitle">Mapping Facility Reported Releases and Transfers that Matter for Environmental Health
+        </div>
+        <div class="byline">Author: Jessica Nwafor • Data: EPA TRI 2024 Preliminary</div>
+    </header>
+
+    <div class="layout">
+        <aside>
+            <div class="card">
+                <div class="controls-row" style="justify-content:space-between; align-items:center;">
+                    <div class="kicker">Filters</div>
+                    <button id="btnInfo" class="btn btn-pill" aria-haspopup="dialog"
+                        aria-controls="infoModal">About</button>
+                </div>
+
+                <label for="chemSel">Filter by chemical</label>
+                <select id="chemSel" aria-label="Filter by chemical"></select>
+
+                <div class="kicker" style="margin-top:10px;">Quick filters</div>
+                <div id="presetChips" class="row" aria-label="Preset chemicals"></div>
+
+                <div class="controls-row" style="margin-top:8px;">
+                    <label for="brevardToggle" class="small" style="margin:0;">Brevard County only</label>
+                    <input type="checkbox" id="brevardToggle" aria-label="Brevard County only" />
+                    <label for="heatToggle" class="small" style="margin:0 0 0 12px;">Heatmap density</label>
+                    <input type="checkbox" id="heatToggle" aria-label="Toggle heatmap" />
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label for="minRelease">Minimum total releases in pounds</label>
+                    <input id="minRelease" type="range" min="0" max="500000" step="1000" value="0" />
+                    <div class="controls-row small" style="justify-content:space-between;">
+                        <span>Min: <b id="minRangeLo">0</b></span>
+                        <span>Current: <b id="minVal">0</b></span>
+                        <span>Max: <b id="minRangeHi">500,000</b></span>
+                    </div>
+                </div>
+
+                <div style="margin-top:10px;">
+                    <label for="searchBox">Search facility or city</label>
+                    <input id="searchBox" type="text" placeholder="Type and press Enter"
+                        aria-label="Search facility or city" />
+                </div>
+
+                <div class="controls-row" style="margin-top:10px;">
+                    <button id="btnSpaceCoast" class="btn">Zoom to Space Coast</button>
+                    <button id="btnReset" class="btn">Reset</button>
+                </div>
+
+                <div class="controls-row" style="margin-top:8px;">
+                    <button id="btnExport" class="btn">Export current filter (CSV)</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="kicker">Current view</div>
+                <div>
+                    <span class="chip"><span class="count" id="shownCount">0</span> facilities</span>
+                    <span class="chip">Chemicals: <span id="chemCount">0</span></span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="kicker">Top chemicals in view</div>
+                <div class="chart-wrap">
+                    <canvas id="chemChart" aria-label="Bar chart of top chemicals"></canvas>
+                </div>
+                <div class="small" style="margin-top:6px;">Totals reflect current filters</div>
+            </div>
+
+            <div class="card small">
+                Quantities are in pounds. Dioxin compounds are reported in grams in TRI, so they will appear smaller
+                relative to other chemicals.
+            </div>
+        </aside>
+
+        <main>
+            <div id="spinner" role="status" aria-live="polite">
+                <div class="spinner-dot"></div>
+                <div class="spinner-dot"></div>
+                <div class="spinner-dot"></div>
+            </div>
+
+            <div id="map" role="region" aria-label="Map of Florida TRI facilities"></div>
+
+            <div class="legend" id="legend">
+                <div style="font-weight:700; margin-bottom:4px;">Legend</div>
+                <div class="small" style="margin-bottom:4px;">Circle size shows <b>Total Releases</b> in pounds</div>
+                <div id="sizeScale" class="small" style="margin:4px 0 6px 0;"></div>
+                <div class="small" style="margin:4px 0;">Color indicates chemical. Top in view:</div>
+                <div id="legendColors"></div>
+            </div>
+        </main>
+    </div>
+
+    <footer>
+        Source: EPA TRI 2024 Preliminary Basic Data Files.
+        <a class="linkish"
+            href="https://www.epa.gov/toxics-release-inventory-tri-program/2024-tri-preliminary-dataset-basic-data-files"
+            target="_blank" rel="noopener">Dataset page</a>
+    </footer>
+
+    <!-- Info modal -->
+    <div id="infoModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-card">
+            <h2 id="modalTitle" style="margin:0 0 8px 0; font-size:18px;">About this map</h2>
+            <p class="small" style="margin:0 0 8px 0;">
+                This map visualizes facilities that report to the EPA TRI. Circle size shows total on site and off site
+                releases in pounds.
+                Use the filters to explore specific chemicals, zoom to the Space Coast, or view density as a heatmap.
+                The bar chart summarizes the top chemicals visible in the current map view.
+            </p>
+            <div class="controls-row" style="justify-content:flex-end; margin-top:8px;">
+                <button id="btnCloseModal" class="btn btn-pill">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ---------- Config ----------
+        const DATA_URL = "data/tri_fl_2024_basic_clean.csv";
+        const MAP_CENTER = [28.3, -81.6];
+        const MAP_ZOOM = 6;
+        const MAX_RADIUS = 42;
+        const PRESET_CHEMICALS = ["Ammonia", "Methanol", "Toluene", "Xylene", "Benzene", "Nitrate compounds",
+            "Chromium", "Lead", "Hydrogen fluoride"
+        ];
+        const BREVARD_BBOX = {
+            minLat: 27.70,
+            maxLat: 28.80,
+            minLng: -80.95,
+            maxLng: -80.20
+        };
+
+        // ---------- Elements ----------
+        const chemSel = document.getElementById('chemSel');
+        const minRange = document.getElementById('minRelease');
+        const minRangeLo = document.getElementById('minRangeLo');
+        const minRangeHi = document.getElementById('minRangeHi');
+        const minVal = document.getElementById('minVal');
+        const shownCount = document.getElementById('shownCount');
+        const chemCount = document.getElementById('chemCount');
+        const legendColors = document.getElementById('legendColors');
+        const sizeScale = document.getElementById('sizeScale');
+        const presetChips = document.getElementById('presetChips');
+        const searchBox = document.getElementById('searchBox');
+        const btnSpaceCoast = document.getElementById('btnSpaceCoast');
+        const btnReset = document.getElementById('btnReset');
+        const btnExport = document.getElementById('btnExport');
+        const brevardToggle = document.getElementById('brevardToggle');
+        const heatToggle = document.getElementById('heatToggle');
+        const spinner = document.getElementById('spinner');
+        const infoModal = document.getElementById('infoModal');
+        const btnInfo = document.getElementById('btnInfo');
+        const btnCloseModal = document.getElementById('btnCloseModal');
+
+        // ---------- Utilities ----------
+        const COLOR_SCALE = chroma.scale(["#22c55e", "#14b8a6", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"]);
+
+        function colorForChemical(name) {
+            const h = [...String(name || "")].reduce((a, c) => a + c.charCodeAt(0), 0);
+            return COLOR_SCALE((h % 100) / 100).hex();
+        }
+
+        function sizeForValue(v) {
+            const x = Math.max(0, Number(v) || 0);
+            const r = Math.min(MAX_RADIUS, Math.sqrt(x) * 0.20);
+            return Math.max(3, r);
+        }
+
+        function inBrevardBBox(d) {
+            return d.LATITUDE >= BREVARD_BBOX.minLat && d.LATITUDE <= BREVARD_BBOX.maxLat &&
+                d.LONGITUDE >= BREVARD_BBOX.minLng && d.LONGITUDE <= BREVARD_BBOX.maxLng;
+        }
+
+        function normalizeRow(row) {
+            return {
+                YEAR: row.YEAR,
+                TRIFID: row.TRIFID,
+                FRS_ID: row.FRS_ID,
+                FACILITY_NAME: row.FACILITY_NAME,
+                CITY: row.CITY,
+                STATE: row.STATE,
+                LATITUDE: Number(row.LATITUDE),
+                LONGITUDE: Number(row.LONGITUDE),
+                PRIMARY_NAICS: row.PRIMARY_NAICS,
+                CHEMICAL: row.CHEMICAL,
+                ON_SITE_RELEASE_TOTAL: Number(row.ON_SITE_RELEASE_TOTAL),
+                OFF_SITE_RELEASE_TOTAL: Number(row.OFF_SITE_RELEASE_TOTAL),
+                TOTAL_RELEASES: Number(row.TOTAL_RELEASES)
+            };
+        }
+
+        function loadCSV(url) {
+            return new Promise((resolve, reject) => {
+                Papa.parse(url, {
+                    download: true,
+                    header: true,
+                    dynamicTyping: false,
+                    complete: res => resolve(res.data),
+                    error: err => reject(err)
+                });
+            });
+        }
+
+        function csvDownload(rows, filename = "tri_filtered.csv") {
+            const csv = Papa.unparse(rows);
+            const blob = new Blob([csv], {
+                type: "text/csv;charset=utf-8;"
+            });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        // ---------- Map ----------
+        const map = L.map('map', {
+            zoomControl: true
+        }).setView(MAP_CENTER, MAP_ZOOM);
+        const osmStd = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        const osmHot = L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors, &copy; Humanitarian OSM Team'
+        });
+        const esriImg = L.tileLayer(
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: 'Tiles &copy; Esri'
+            });
+        const baseLayers = {
+            "OSM Standard": osmStd,
+            "OSM Humanitarian": osmHot,
+            "Esri World Imagery": esriImg
+        };
+
+        const clusterGroup = L.markerClusterGroup({
+            spiderfyOnMaxZoom: true,
+            showCoverageOnHover: false,
+            maxClusterRadius: 52
+        });
+        const pointLayerGroup = L.layerGroup();
+        clusterGroup.addTo(map);
+        pointLayerGroup.addTo(map);
+
+        L.control.layers(baseLayers, null, {
+            collapsed: true,
+            position: "topleft"
+        }).addTo(map);
+        L.control.scale({
+            imperial: false
+        }).addTo(map);
+
+        let heatLayer = null;
+
+        // ---------- Data + Rendering ----------
+        let records = [];
+        let chemicals = [];
+        let activePreset = "";
+        let chemChart = null;
+
+        function makeChips() {
+            presetChips.innerHTML = "";
+            const available = ["Ammonia", "Methanol", "Toluene", "Xylene", "Benzene", "Nitrate compounds", "Chromium",
+                    "Lead", "Hydrogen fluoride"
+                ]
+                .filter(c => chemicals.includes(c));
+            const list = available.length ? available : chemicals.slice(0, 8);
+            list.forEach(chem => {
+                const chip = document.createElement("span");
+                chip.className = "chip";
+                chip.textContent = chem;
+                chip.setAttribute("role", "button");
+                chip.tabIndex = 0;
+                chip.addEventListener("click", () => togglePreset(chem));
+                chip.addEventListener("keydown", e => {
+                    if (e.key === "Enter" || e.key === " ") togglePreset(chem);
+                });
+                presetChips.appendChild(chip);
+            });
+            updateChipActiveState();
+        }
+
+        function togglePreset(chem) {
+            if (activePreset === chem) {
+                activePreset = "";
+                chemSel.value = "";
+            } else {
+                activePreset = chem;
+                chemSel.value = chem;
+            }
+            updateChipActiveState();
+            render();
+        }
+
+        function updateChipActiveState() {
+            [...presetChips.querySelectorAll(".chip")].forEach(ch => {
+                ch.classList.toggle("active", ch.textContent === activePreset);
+            });
+        }
+
+        function populateFilters() {
+            chemicals = [...new Set(records.map(d => d.CHEMICAL))].sort((a, b) => a.localeCompare(b));
+            chemSel.innerHTML = `<option value="">All chemicals</option>` + chemicals.map(c => `<option>${c}</option>`)
+                .join("");
+            chemCount.textContent = chemicals.length;
+            makeChips();
+        }
+
+        // Compact size legend with capped bubbles and scroll safety
+        function buildSizeLegend() {
+            const maxVal = Number(minRange.max) || 500000;
+            const ticks = [0, Math.round(maxVal * 0.1), Math.round(maxVal * 0.25), Math.round(maxVal * 0.5), maxVal];
+            sizeScale.innerHTML = ticks.map(t => {
+                const r = Math.min(10, sizeForValue(
+                t)); // cap visual bubble radius in legend to keep it compact
+                return `<div class="sizeRow"><span class="sizeDot" style="width:${r*2}px;height:${r*2}px"></span>${t.toLocaleString()} lbs</div>`;
+            }).join("");
+        }
+
+        // Keep top 5 only to shorten legend block
+        function updateColorLegend(filtered) {
+            const byChem = new Map();
+            filtered.forEach(d => {
+                const k = d.CHEMICAL || "Unknown";
+                byChem.set(k, (byChem.get(k) || 0) + (Number(d.TOTAL_RELEASES) || 0));
+            });
+            const top = [...byChem.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name]) => name);
+
+            legendColors.innerHTML = "";
+            top.forEach(name => {
+                const color = colorForChemical(name);
+                const row = document.createElement('div');
+                row.style.display = "flex";
+                row.style.alignItems = "center";
+                row.style.marginBottom = "3px";
+                row.innerHTML = `<span class="swatch" style="background:${color}"></span>${name}`;
+                legendColors.appendChild(row);
+            });
+        }
+
+        function clearLayers() {
+            clusterGroup.clearLayers();
+            pointLayerGroup.clearLayers();
+            if (heatLayer) {
+                heatLayer.remove();
+                heatLayer = null;
+            }
+        }
+
+        function currentFilters() {
+            const chemFilter = chemSel.value;
+            const minR = Number(minRange.value) || 0;
+            const onlyBrevard = brevardToggle.checked;
+            return {
+                chemFilter,
+                minR,
+                onlyBrevard
+            };
+        }
+
+        function applyFilters() {
+            const {
+                chemFilter,
+                minR,
+                onlyBrevard
+            } = currentFilters();
+            return records.filter(d =>
+                (chemFilter ? d.CHEMICAL === chemFilter : true) &&
+                isFinite(d.TOTAL_RELEASES) && d.TOTAL_RELEASES >= minR &&
+                isFinite(d.LATITUDE) && isFinite(d.LONGITUDE) &&
+                (onlyBrevard ? inBrevardBBox(d) : true)
+            );
+        }
+
+        function render() {
+            clearLayers();
+
+            if (!chemSel.value) activePreset = "";
+            updateChipActiveState();
+
+            const filtered = applyFilters();
+            shownCount.textContent = filtered.length;
+
+            filtered.forEach(d => {
+                const r = sizeForValue(d.TOTAL_RELEASES);
+                const color = colorForChemical(d.CHEMICAL);
+                const opts = {
+                    radius: r,
+                    color,
+                    weight: 1,
+                    fillColor: color,
+                    fillOpacity: 0.65
+                };
+                const popup = `
+          <div style="font-weight:700; margin-bottom:4px;">${d.FACILITY_NAME}</div>
+          <div class="small" style="margin-bottom:6px;">${d.CITY}, ${d.STATE} • ${d.PRIMARY_NAICS||""} • ${d.YEAR||""}</div>
+          <div class="small"><b>Chemical:</b> ${d.CHEMICAL}</div>
+          <div class="small"><b>Total releases:</b> ${Number(d.TOTAL_RELEASES).toLocaleString()} lbs</div>
+          <div class="small">On site: ${Number(d.ON_SITE_RELEASE_TOTAL).toLocaleString()} • Off site: ${Number(d.OFF_SITE_RELEASE_TOTAL).toLocaleString()}</div>
+        `;
+                const cm = L.circleMarker([d.LATITUDE, d.LONGITUDE], opts).bindPopup(popup);
+                clusterGroup.addLayer(cm);
+                pointLayerGroup.addLayer(L.circleMarker([d.LATITUDE, d.LONGITUDE], {
+                    radius: 4,
+                    opacity: 0,
+                    fillOpacity: 0
+                }));
+            });
+
+            if (heatToggle.checked) {
+                const pts = filtered.map(d => {
+                    const val = Math.max(1, Math.log10(Math.max(1, d.TOTAL_RELEASES)));
+                    return [d.LATITUDE, d.LONGITUDE, val];
+                });
+                heatLayer = L.heatLayer(pts, {
+                    radius: 28,
+                    blur: 22,
+                    maxZoom: 10,
+                    minOpacity: 0.25
+                }).addTo(map);
+            }
+
+            updateChart(filtered);
+            updateColorLegend(filtered);
+        }
+
+        // Helper: wrap and abbreviate long labels for x axis without growing chart height
+        function wrapLabel(label) {
+            if (!label) return "";
+            let s = String(label);
+            // gentle abbreviation to keep meaning
+            s = s.replace(/ compounds/i, " comp.")
+                .replace(/ fluoride/i, " fluor.")
+                .replace(/ chloride/i, " chlor.")
+                .replace(/ dichloro/i, " dichl.")
+                .replace(/ trichloro/i, " trichl.");
+            const maxLineLen = 12;
+            const words = s.split(/\s+/);
+            const lines = [];
+            let line = "";
+            for (const w of words) {
+                const test = (line ? line + " " : "") + w;
+                if (test.length > maxLineLen) {
+                    if (line) lines.push(line);
+                    // if a single long token, hard split
+                    if (w.length > maxLineLen) {
+                        lines.push(w.slice(0, maxLineLen));
+                        line = w.slice(maxLineLen);
+                    } else {
+                        line = w;
+                    }
+                } else {
+                    line = test;
+                }
+            }
+            if (line) lines.push(line);
+            return lines.slice(0, 3); // cap to 3 lines to avoid height pressure
+        }
+
+        function updateChart(filtered) {
+            const byChem = new Map();
+            filtered.forEach(d => {
+                const k = d.CHEMICAL || "Unknown";
+                byChem.set(k, (byChem.get(k) || 0) + (Number(d.TOTAL_RELEASES) || 0));
+            });
+            const entries = [...byChem.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+            const labels = entries.map(e => e[0]);
+            const data = entries.map(e => Math.round(e[1]));
+
+            if (!chemChart) {
+                const ctx = document.getElementById("chemChart");
+                chemChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: 'Total releases (lbs)',
+                            data,
+                            categoryPercentage: 0.9, // slightly narrower categories to create label room
+                            barPercentage: 0.8
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Top chemicals in current view',
+                                padding: {
+                                    top: 4,
+                                    bottom: 4
+                                }
+                            },
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false
+                            }
+                        },
+                        layout: {
+                            padding: {
+                                top: 4,
+                                bottom: 8
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    autoSkip: false,
+                                    maxRotation: 0,
+                                    font: {
+                                        size: 9
+                                    }, // smaller font without changing chart height
+                                    callback: function (value) {
+                                        return wrapLabel(this.getLabelForValue(value));
+                                    }
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            },
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } else {
+                chemChart.data.labels = labels;
+                chemChart.data.datasets[0].data = data;
+                chemChart.update();
+            }
+        }
+
+        // ---------- Events ----------
+        function attachEvents() {
+            chemSel.addEventListener('change', () => {
+                activePreset = chemSel.value;
+                updateChipActiveState();
+                render();
+            });
+
+            minRange.addEventListener('input', () => {
+                minVal.textContent = Number(minRange.value).toLocaleString();
+                render();
+            });
+
+            brevardToggle.addEventListener('change', render);
+            heatToggle.addEventListener('change', render);
+
+            document.getElementById('btnSpaceCoast').addEventListener('click', () => {
+                map.flyTo([28.3922, -80.6077], 10, {
+                    duration: 0.8
+                });
+            });
+
+            btnReset.addEventListener('click', () => {
+                chemSel.value = "";
+                activePreset = "";
+                updateChipActiveState();
+                brevardToggle.checked = false;
+                heatToggle.checked = false;
+                minRange.value = 0;
+                minVal.textContent = "0";
+                map.setView(MAP_CENTER, MAP_ZOOM);
+                render();
+            });
+
+            btnExport.addEventListener('click', () => {
+                const filtered = applyFilters();
+                csvDownload(filtered, "tri_filtered.csv");
+            });
+
+            searchBox.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    const q = searchBox.value.trim().toLowerCase();
+                    if (!q) return;
+                    const match = records.find(d =>
+                        String(d.FACILITY_NAME || "").toLowerCase().includes(q) ||
+                        String(d.CITY || "").toLowerCase().includes(q)
+                    );
+                    if (match && isFinite(match.LATITUDE) && isFinite(match.LONGITUDE)) {
+                        map.flyTo([match.LATITUDE, match.LONGITUDE], 11, {
+                            duration: 0.8
+                        });
+                    }
+                }
+            });
+
+            btnInfo.addEventListener('click', () => {
+                infoModal.style.display = "flex";
+            });
+            btnCloseModal.addEventListener('click', () => {
+                infoModal.style.display = "none";
+            });
+            infoModal.addEventListener('click', e => {
+                if (e.target === infoModal) infoModal.style.display = "none";
+            });
+        }
+
+        // ---------- Main ----------
+        async function main() {
+            try {
+                spinner.style.display = "flex";
+                const raw = await loadCSV(DATA_URL);
+                records = raw.map(normalizeRow).filter(d => isFinite(d.LATITUDE) && isFinite(d.LONGITUDE));
+                populateFilters();
+                minRangeLo.textContent = Number(minRange.min).toLocaleString();
+                minRangeHi.textContent = Number(minRange.max).toLocaleString();
+                minVal.textContent = Number(minRange.value).toLocaleString();
+                buildSizeLegend();
+                attachEvents();
+                render();
+            } catch (err) {
+                console.error("Failed to load data:", err);
+                alert("Data failed to load. Check the CSV path and try a local server.");
+            } finally {
+                spinner.style.display = "none";
+            }
+        }
+        main();
+    </script>
+</body>
+
+</html>
