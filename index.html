@@ -439,6 +439,9 @@
         <a class="linkish"
             href="https://www.epa.gov/toxics-release-inventory-tri-program/2024-tri-preliminary-dataset-basic-data-files"
             target="_blank" rel="noopener">Dataset page</a>
+        •
+        <a class="linkish" href="https://github.com/Jonw222/Florida-Toxic-Release-Hotspots-2024-V2/blob/main/README.md"
+            target="_blank" rel="noopener">View README on GitHub (.com)</a>
     </footer>
 
     <!-- Info modal -->
@@ -660,7 +663,7 @@
             const ticks = [0, Math.round(maxVal * 0.1), Math.round(maxVal * 0.25), Math.round(maxVal * 0.5), maxVal];
             sizeScale.innerHTML = ticks.map(t => {
                 const r = Math.min(10, sizeForValue(
-                t)); // cap visual bubble radius in legend to keep it compact
+                    t)); // cap visual bubble radius in legend to keep it compact
                 return `<div class="sizeRow"><span class="sizeDot" style="width:${r*2}px;height:${r*2}px"></span>${t.toLocaleString()} lbs</div>`;
             }).join("");
         }
