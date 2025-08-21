@@ -1,0 +1,1 @@
+Github prevents me from uploading the original data, describing the file as "too large." Here is the link to the raw dataset: https://www.epa.gov/toxics-release-inventory-tri-program/2024-tri-preliminary-dataset-basic-data-files
