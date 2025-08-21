@@ -1,6 +1,9 @@
 # Florida-Toxic-Release-Hotspots-2024-V2
 Updated Interactive map of Florida Toxic Release Hotspots (TR)I 2024 facility releases using proportional circles, chemical filters, clustering, and a Space Coast zoom. It is built with Leaflet.
 
+# View Live Map
+[Open the Map](https://jonw222.github.io/Florida-Toxic-Release-Hotspots-2024-V2/)
+
 # Data Source and Sample
 ### Primary Dataset
  EPA Toxics Release Inventory (TRI) 2024 Preliminary, Basic Data Files, Florida subset is the primary dataset (downloaded data is in the assignment folder): https://www.epa.gov/toxics-release-inventory-tri-program/2024-tri-preliminary-dataset-basic-data-files
