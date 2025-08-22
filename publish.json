@@ -1,0 +1,7 @@
+{
+  "title": "Florida Toxics Release Hotspots 2024",
+  "info": "Interactive map of EPA TRI 2024 preliminary Florida facilities. Circle size shows total releases in pounds. Filters allow exploring chemicals and focusing on the Space Coast.",
+  "coordinates": [28.3, -81.6],
+  "author": "Jessica Nwafor",
+  "link": "https://jonw222.github.io/Florida-Toxic-Release-Hotspots-2024-V2"
+}
